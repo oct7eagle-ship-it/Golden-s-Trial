@@ -15,6 +15,7 @@ th{background:#eee}
 .btn{padding:8px 12px;border:none;border-radius:6px;cursor:pointer;font-size:1em}
 .present{background:#16a34a;color:#fff}
 .absent{background:#dc2626;color:#fff}
+.deleteBtn{background:#f59e0b;color:#fff}
 .actions{display:flex;gap:8px;justify-content:center;margin-top:16px;flex-wrap:wrap}
 .hidden{display:none}
 input{padding:8px;width:100%;box-sizing:border-box;margin-bottom:8px}
@@ -64,7 +65,7 @@ h4{margin-bottom:5px;margin-top:10px}
 const students=["عبد الحفيظ أحمد عثمان","سالبان هاشي محمد","محمود عبدي محمد","مسلح إبراهيم عدن","شفيعي قدساني جدي","بشير محمد خليل","خضر عباس ويرح","خليفة عبدي الموجي","أيوب إبراهيم عبدي","عثمان إبراهيم مهد","عبد الرحمن عبد الفتاح عدن","خالد محمود محمد","عبيد إبراهيم","عبد الرؤوف أحمد عبد الله","محمد عدن محمد","محمود عبد الله ديرية","محمود عبد النور علي"];
 let attendance={};
 
-// Clear previous data to start fresh
+// Start fresh
 Object.keys(localStorage).filter(k=>k.startsWith('session_')).forEach(k=>localStorage.removeItem(k));
 
 document.addEventListener('click', e => {
@@ -132,7 +133,7 @@ function loadAdmin(){
   let html='';
   Object.keys(localStorage).filter(k=>k.startsWith('session_')).sort().forEach(k=>{
     const s=JSON.parse(localStorage.getItem(k));
-    html+=`<h3>التاريخ: ${s.date}</h3>`;
+    html+=`<h3>التاريخ: ${s.date} <button class="btn deleteBtn" onclick="deleteSession('${s.date}')">حذف</button></h3>`;
     if(s.submitted){
       let present=[], absent=[], notVerified=[];
       students.forEach(st=>{
@@ -148,11 +149,31 @@ function loadAdmin(){
   document.getElementById('adminData').innerHTML=html;
 }
 
+function deleteSession(date){
+  if(confirm('هل أنت متأكد من حذف هذه الجلسة؟')) {
+    localStorage.removeItem('session_'+date);
+    loadAdmin();
+  }
+}
+
 function downloadPDF(type){
   let element;
-  if(type==='lecturer') element=document.getElementById('lecturer');
-  else element=document.getElementById('admin');
-  html2pdf().from(element).set({margin:0.5, filename:type==='lecturer'?'attendance.pdf':'admin_sessions.pdf', html2canvas:{scale:2}}).save();
+  if(type==='lecturer') {
+    element = document.getElementById('lecturer').cloneNode(true);
+    element.querySelectorAll('input').forEach(input => {
+      const span = document.createElement('span');
+      span.textContent = input.value;
+      input.parentNode.replaceChild(span, input);
+    });
+  } else {
+    element = document.getElementById('admin').cloneNode(true);
+  }
+
+  html2pdf().from(element).set({
+    margin:0.5,
+    filename: type==='lecturer'?'attendance.pdf':'admin_sessions.pdf',
+    html2canvas: {scale:2, useCORS:true, scrollY:0}
+  }).save();
 }
 
 function logout(){
