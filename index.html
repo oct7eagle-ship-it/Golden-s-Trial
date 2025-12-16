@@ -2,22 +2,25 @@
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>نظام الحضور – دبلوم اللغة العربية</title>
 <style>
 body{font-family:Arial;background:#f4f6f8;margin:0;padding:16px}
-.card{background:#fff;border-radius:12px;padding:16px;max-width:900px;margin:auto;box-shadow:0 4px 12px rgba(0,0,0,.1)}
-h1,h2{text-align:center}
-.info{margin-bottom:12px;line-height:1.8}
-table{width:100%;border-collapse:collapse;margin-top:12px}
-th,td{border:1px solid #ccc;padding:8px;text-align:center}
+.card{background:#fff;border-radius:12px;padding:16px;margin:auto;box-shadow:0 4px 12px rgba(0,0,0,.1);max-width:100%;width:95%}
+h1,h2,h3{text-align:center;font-size:1.5em;margin-bottom:10px}
+.info{margin-bottom:12px;line-height:1.6;font-size:1em}
+table{width:100%;border-collapse:collapse;margin-top:12px;font-size:0.9em}
+th,td{border:1px solid #ccc;padding:6px;text-align:center}
 th{background:#eee}
-.btn{padding:6px 12px;border:none;border-radius:6px;cursor:pointer}
+.btn{padding:8px 12px;border:none;border-radius:6px;cursor:pointer;font-size:1em}
 .present{background:#16a34a;color:#fff}
 .absent{background:#dc2626;color:#fff}
 .actions{display:flex;gap:8px;justify-content:center;margin-top:16px;flex-wrap:wrap}
 .hidden{display:none}
-input{padding:6px}
+input{padding:8px;width:100%;box-sizing:border-box;margin-bottom:8px}
+ul{list-style:none;padding:0}
+li{margin:2px 0}
+h4{margin-bottom:5px;margin-top:10px}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 </head>
@@ -25,8 +28,8 @@ input{padding:6px}
 
 <div class="card" id="login">
 <h2>تسجيل الدخول</h2>
-<input id="user" placeholder="اسم المستخدم"><br><br>
-<input id="pass" type="password" placeholder="كلمة المرور"><br><br>
+<input id="user" placeholder="اسم المستخدم">
+<input id="pass" type="password" placeholder="كلمة المرور">
 <button type="button" class="btn present" id="loginBtn">دخول</button>
 <div id="loginMsg" style="text-align:center;margin-top:8px"></div>
 </div>
@@ -42,7 +45,7 @@ input{padding:6px}
 <table id="table"><thead><tr><th>الطالب</th><th>الحالة</th><th>تغيير</th></tr></thead><tbody></tbody></table>
 <div class="actions">
 <button type="button" class="btn present" id="submitBtn">إرسال الجلسة</button>
-<button class="btn" onclick="downloadPDF()">تحميل PDF</button>
+<button class="btn" onclick="downloadPDF('lecturer')">تحميل PDF</button>
 <button class="btn absent" onclick="logout()">إنهاء الجلسة</button>
 </div>
 <div id="msgBox"></div>
@@ -51,14 +54,19 @@ input{padding:6px}
 <div class="card hidden" id="admin">
 <h1>لوحة المدير</h1>
 <div id="adminData"></div>
+<div class="actions">
+<button class="btn" onclick="downloadPDF('admin')">تحميل PDF لكل الجلسات</button>
 <button class="btn absent" onclick="logout()">خروج</button>
+</div>
 </div>
 
 <script>
 const students=["عبد الحفيظ أحمد عثمان","سالبان هاشي محمد","محمود عبدي محمد","مسلح إبراهيم عدن","شفيعي قدساني جدي","بشير محمد خليل","خضر عباس ويرح","خليفة عبدي الموجي","أيوب إبراهيم عبدي","عثمان إبراهيم مهد","عبد الرحمن عبد الفتاح عدن","خالد محمود محمد","عبيد إبراهيم","عبد الرؤوف أحمد عبد الله","محمد عدن محمد","محمود عبد الله ديرية","محمود عبد النور علي"];
 let attendance={};
 
-// Events
+// Clear previous data to start fresh
+Object.keys(localStorage).filter(k=>k.startsWith('session_')).forEach(k=>localStorage.removeItem(k));
+
 document.addEventListener('click', e => {
   if(e.target && e.target.id==='submitBtn') submitSession();
   if(e.target && e.target.id==='loginBtn') login();
@@ -70,7 +78,7 @@ function login(){
   const msg = document.getElementById('loginMsg');
   msg.style.color='red';
 
-  const isAdmin = ((u==='admin'||u==='مدير') && (p==='admin123'||p==='مدير123'));
+  const isAdmin = ((u==='admin'||u==='مدير') && (p==='admin123'||p==='مدير123'||p==='12'||p==='123'));
   const isLecturer = ((u==='Mudathir'||u==='مدثر') && p==='12');
 
   if(isAdmin){
@@ -109,29 +117,42 @@ function setStatus(name,val){
 function submitSession(){
   const d=document.getElementById('date').value;
   if(!d){alert('اختر التاريخ'); return;}
-  localStorage.setItem('session_'+d, JSON.stringify({date:d, attendance, submitted:true}));
-  document.getElementById('msgBox')?.remove();
-  const msg=document.createElement('div');
-  msg.id='msgBox';
-  msg.style.color='green';
-  msg.style.textAlign='center';
-  msg.style.marginTop='10px';
-  msg.textContent='تم إرسال الحضور بنجاح';
-  document.getElementById('lecturer').appendChild(msg);
+  localStorage.setItem('session_'+d, JSON.stringify({date:d, attendance:Object.assign({}, attendance), submitted:true}));
+
+  const msgBox=document.getElementById('msgBox');
+  msgBox.style.color='green';
+  msgBox.style.textAlign='center';
+  msgBox.style.marginTop='10px';
+  msgBox.textContent='تم إرسال الحضور بنجاح';
+
+  loadAdmin();
 }
 
 function loadAdmin(){
-  let html='<ul>';
-  Object.keys(localStorage).filter(k=>k.startsWith('session_')).forEach(k=>{
+  let html='';
+  Object.keys(localStorage).filter(k=>k.startsWith('session_')).sort().forEach(k=>{
     const s=JSON.parse(localStorage.getItem(k));
-    html+=`<li>${s.date} : ${s.submitted?'تم الإرسال':'لم يرسل'}</li>`;
+    html+=`<h3>التاريخ: ${s.date}</h3>`;
+    if(s.submitted){
+      let present=[], absent=[], notVerified=[];
+      students.forEach(st=>{
+        if(!s.attendance[st] || s.attendance[st]==='') notVerified.push(st);
+        else if(s.attendance[st]==='حاضر') present.push(st);
+        else absent.push(st);
+      });
+      html+='<h4>الحاضرون:</h4><ul>'+present.map(x=>'<li>'+x+'</li>').join('')+'</ul>';
+      html+='<h4>الغائبون:</h4><ul>'+absent.map(x=>'<li>'+x+'</li>').join('')+'</ul>';
+      html+='<h4>لم يتم التحديد:</h4><ul>'+notVerified.map(x=>'<li>'+x+'</li>').join('')+'</ul>';
+    } else html+='<p>لم يتم الإرسال</p>';
   });
-  html+='</ul>';
   document.getElementById('adminData').innerHTML=html;
 }
 
-function downloadPDF(){
-  html2pdf().from(document.getElementById('lecturer')).save('attendance.pdf');
+function downloadPDF(type){
+  let element;
+  if(type==='lecturer') element=document.getElementById('lecturer');
+  else element=document.getElementById('admin');
+  html2pdf().from(element).set({margin:0.5, filename:type==='lecturer'?'attendance.pdf':'admin_sessions.pdf', html2canvas:{scale:2}}).save();
 }
 
 function logout(){
