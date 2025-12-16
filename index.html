@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>نظام الحضور – دبلوم اللغة العربية</title>
+<style>
+body{font-family:Arial;background:#f4f6f8;margin:0;padding:16px}
+.card{background:#fff;border-radius:12px;padding:16px;max-width:900px;margin:auto;box-shadow:0 4px 12px rgba(0,0,0,.1)}
+h1,h2{text-align:center}
+.info{margin-bottom:12px;line-height:1.8}
+table{width:100%;border-collapse:collapse;margin-top:12px}
+th,td{border:1px solid #ccc;padding:8px;text-align:center}
+th{background:#eee}
+.btn{padding:6px 12px;border:none;border-radius:6px;cursor:pointer}
+.present{background:#16a34a;color:#fff}
+.absent{background:#dc2626;color:#fff}
+.actions{display:flex;gap:8px;justify-content:center;margin-top:16px;flex-wrap:wrap}
+.hidden{display:none}
+input{padding:6px}
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+</head>
+<body>
+
+<div class="card" id="login">
+<h2>تسجيل الدخول</h2>
+<input id="user" placeholder="اسم المستخدم"><br><br>
+<input id="pass" type="password" placeholder="كلمة المرور"><br><br>
+<button type="button" class="btn present" id="loginBtn">دخول</button>
+<div id="loginMsg" style="text-align:center;margin-top:8px"></div>
+</div>
+
+<div class="card hidden" id="lecturer">
+<h1>جلسة المحاضر</h1>
+<div class="info">
+<b>الدورة:</b> دبلوم اللغة العربية<br>
+<b>المحاضر:</b> مدثر عبدي محمد<br>
+<b>الوقت:</b> 4:00 – 5:30<br>
+<b>التاريخ:</b> <input type="date" id="date">
+</div>
+<table id="table"><thead><tr><th>الطالب</th><th>الحالة</th><th>تغيير</th></tr></thead><tbody></tbody></table>
+<div class="actions">
+<button type="button" class="btn present" id="submitBtn">إرسال الجلسة</button>
+<button class="btn" onclick="downloadPDF()">تحميل PDF</button>
+<button class="btn absent" onclick="logout()">إنهاء الجلسة</button>
+</div>
+<div id="msgBox"></div>
+</div>
+
+<div class="card hidden" id="admin">
+<h1>لوحة المدير</h1>
+<div id="adminData"></div>
+<button class="btn absent" onclick="logout()">خروج</button>
+</div>
+
+<script>
+const students=["عبد الحفيظ أحمد عثمان","سالبان هاشي محمد","محمود عبدي محمد","مسلح إبراهيم عدن","شفيعي قدساني جدي","بشير محمد خليل","خضر عباس ويرح","خليفة عبدي الموجي","أيوب إبراهيم عبدي","عثمان إبراهيم مهد","عبد الرحمن عبد الفتاح عدن","خالد محمود محمد","عبيد إبراهيم","عبد الرؤوف أحمد عبد الله","محمد عدن محمد","محمود عبد الله ديرية","محمود عبد النور علي"];
+let attendance={};
+
+// Events
+document.addEventListener('click', e => {
+  if(e.target && e.target.id==='submitBtn') submitSession();
+  if(e.target && e.target.id==='loginBtn') login();
+});
+
+function login(){
+  const u = document.getElementById('user').value.trim();
+  const p = document.getElementById('pass').value.trim();
+  const msg = document.getElementById('loginMsg');
+  msg.style.color='red';
+
+  const isAdmin = ((u==='admin'||u==='مدير') && (p==='admin123'||p==='مدير123'));
+  const isLecturer = ((u==='Mudathir'||u==='مدثر') && p==='12');
+
+  if(isAdmin){
+    msg.textContent='تم تسجيل دخول المدير بنجاح';
+    msg.style.color='green';
+    document.getElementById('login').classList.add('hidden');
+    document.getElementById('admin').classList.remove('hidden');
+    loadAdmin();
+  } else if(isLecturer){
+    msg.textContent='تم تسجيل دخول المحاضر بنجاح';
+    msg.style.color='green';
+    document.getElementById('login').classList.add('hidden');
+    document.getElementById('lecturer').classList.remove('hidden');
+    loadTable();
+  } else {
+    msg.textContent='بيانات الدخول غير صحيحة';
+  }
+}
+
+function loadTable(){
+  const tb = document.querySelector('#table tbody');
+  tb.innerHTML='';
+  students.forEach(s=>{
+    attendance[s]='';
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td>${s}</td><td id="st-${s}"></td><td><button class="btn present" onclick="setStatus('${s}','حاضر')">حاضر</button> <button class="btn absent" onclick="setStatus('${s}','غائب')">غائب</button></td>`;
+    tb.appendChild(tr);
+  });
+}
+
+function setStatus(name,val){
+  attendance[name]=val;
+  document.getElementById('st-'+name).textContent=val;
+}
+
+function submitSession(){
+  const d=document.getElementById('date').value;
+  if(!d){alert('اختر التاريخ'); return;}
+  localStorage.setItem('session_'+d, JSON.stringify({date:d, attendance, submitted:true}));
+  document.getElementById('msgBox')?.remove();
+  const msg=document.createElement('div');
+  msg.id='msgBox';
+  msg.style.color='green';
+  msg.style.textAlign='center';
+  msg.style.marginTop='10px';
+  msg.textContent='تم إرسال الحضور بنجاح';
+  document.getElementById('lecturer').appendChild(msg);
+}
+
+function loadAdmin(){
+  let html='<ul>';
+  Object.keys(localStorage).filter(k=>k.startsWith('session_')).forEach(k=>{
+    const s=JSON.parse(localStorage.getItem(k));
+    html+=`<li>${s.date} : ${s.submitted?'تم الإرسال':'لم يرسل'}</li>`;
+  });
+  html+='</ul>';
+  document.getElementById('adminData').innerHTML=html;
+}
+
+function downloadPDF(){
+  html2pdf().from(document.getElementById('lecturer')).save('attendance.pdf');
+}
+
+function logout(){
+  document.getElementById('admin').classList.add('hidden');
+  document.getElementById('lecturer').classList.add('hidden');
+  document.getElementById('login').classList.remove('hidden');
+}
+</script>
+</body>
+</html>
